@@ -1,0 +1,12 @@
+.venv/
+venv/
+data/
+logs/
+scratch/
+__pycache__/
+.pytest_cache/
+.env
+*.epub
+reproduced.epub
+test.epub
+*.docx

@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Semantic Digital Book Publishing Suite</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-base: #0f172a;
+      --bg-surface: #1e293b;
+      --bg-surface-hover: #334155;
+      --border-color: #334155;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      --accent: #d946ef;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --error: #ef4444;
+      --warning: #f59e0b;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --font-outfit: 'Outfit', sans-serif;
+      --font-inter: 'Inter', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-inter);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+
+    /* Header styling */
+    header {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-md);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      background: var(--primary-gradient);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .logo-icon i {
+      color: #fff;
+      font-size: 1.25rem;
+    }
+
+    .logo-text h1 {
+      font-family: var(--font-outfit);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(to right, #fff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .logo-text p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-family: var(--font-outfit);
+      font-size: 0.9rem;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      background: var(--primary-gradient);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    /* Layout Wrapper */
+    main {
+      flex-grow: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .app-view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .app-view.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    /* INGEST VIEW - Upload layout */
+    #ingest-view {
+      justify-content: center;
+      align-items: center;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+
+    .upload-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 3rem;
+      max-width: 650px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .upload-card-header {
+      text-align: center;
+    }
+
+    .upload-card-header h2 {
+      font-family: var(--font-outfit);
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .upload-card-header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .dropzone-container {
+      border: 2px dashed #475569;
+      border-radius: 16px;
+      padding: 2.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(15, 23, 42, 0.3);
+    }
+
+    .dropzone-container:hover, .dropzone-container.drag-over {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .dropzone-container i {
+      font-size: 3rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+
+    .dropzone-container h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .dropzone-container p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .selected-file-badge {
+      display: none;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1rem;
+    }
+
+    .selected-file-badge span {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #818cf8;
+    }
+
+    .selected-file-badge i {
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .selected-file-badge i:hover {
+      color: var(--error);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-control {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text-main);
+      font-family: var(--font-inter);
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn-submit {
+      background: var(--primary-gradient);
+      border: none;
+      color: #fff;
+      padding: 14px;
+      border-radius: 10px;
+      font-family: var(--font-outfit);
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-submit:hover {
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    /* INGEST PROGRESS BOX */
+    .ingest-progress-container {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .progress-bar-wrapper {
+      background: #0f172a;
+      height: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-bar-fill {
+      background: var(--primary-gradient);
+      width: 0%;
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.4s ease;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .console-logger {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #a7f3d0;
+      height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* DOCUMENT EXPLORER VIEW */
+    #explorer-view {
+      flex-direction: column;
+      padding: 2rem 3rem;
+      overflow-y: auto;
+      gap: 2rem;
+    }
+
+    .explorer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .explorer-header h2 {
+      font-family: var(--font-outfit);
+      font-size: 1.75rem;
+    }
+
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .doc-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      transition: all 0.2s ease;
+    }
+
+    .doc-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .doc-card-title {
+      font-family: var(--font-outfit);
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .doc-card-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .doc-card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+    }
+
+    .btn-card {
+      flex-grow: 1;
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-card:hover {
+      background: var(--bg-surface-hover);
+      border-color: #475569;
+    }
+
+    .btn-card.btn-primary-action {
+      background: rgba(99, 102, 241, 0.1);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #818cf8;
+    }
+
+    .btn-card.btn-primary-action:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .btn-card.btn-delete {
+      flex-grow: 0;
+      color: var(--text-muted);
+    }
+
+    .btn-card.btn-delete:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    /* EDIT VIEW LAYOUT */
+    #edit-view {
+      overflow: hidden;
+      display: none;
+    }
+
+    #edit-view.active {
+      display: flex;
+    }
+
+    /* Section navigation tree sidebar */
+    .edit-sidebar {
+      width: 320px;
+      border-right: 1px solid var(--border-color);
+      background: rgba(30, 41, 59, 0.4);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      height: 100%;
+    }
+
+    .sidebar-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h3 {
+      font-family: var(--font-outfit);
+      font-size: 1.05rem;
+      color: var(--text-main);
+    }
+
+    .btn-sidebar-back {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .btn-sidebar-back:hover {
+      color: var(--text-main);
+    }
+
+    .section-tree-list {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .section-node {
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+      color: var(--text-muted);
+    }
+
+    .section-node:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+    }
+
+    .section-node.active {
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      font-weight: 500;
+      border-left: 3px solid var(--primary);
+    }
+
+    /* Nesting level indents */
+    .section-level-1 { margin-left: 0; font-weight: 600; }
+    .section-level-2 { margin-left: 12px; }
+    .section-level-3 { margin-left: 24px; }
+    .section-level-4 { margin-left: 36px; }
+
+    /* Node types icons */
+    .section-node i {
+      font-size: 0.8rem;
+    }
+
+    /* Main Editor Pane */
+    .editor-container {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .editor-header-bar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .editor-doc-title {
+      font-family: var(--font-outfit);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-action {
+      background: var(--bg-base);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: var(--bg-surface-hover);
+      border-color: #475569;
+    }
+
+    .btn-action.btn-accent-save {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.4);
+      color: #4ade80;
+    }
+
+    .btn-action.btn-accent-save:hover {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .btn-action.btn-compile {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: rgba(168, 85, 247, 0.4);
+      color: #c084fc;
+    }
+
+    .btn-action.btn-compile:hover {
+      background: #a855f7;
+      color: #fff;
+    }
+
+    .btn-action.btn-download {
+      background: var(--primary-gradient);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    .btn-action.btn-download:hover {
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    /* Dual Pane Editor styling */
+    .editor-workspace {
+      flex-grow: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    .markdown-pane {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .pane-header {
+      background: #111827;
+      padding: 6px 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .editor-textarea {
+      flex-grow: 1;
+      background: #0b0f19;
+      border: none;
+      color: #cbd5e1;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      padding: 1.5rem;
+      resize: none;
+      outline: none;
+    }
+
+    .preview-pane {
+      width: 50%;
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-content {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 2rem;
+      background: #fff;
+      color: #333;
+    }
+
+    /* Reference EPUB Styling replication in Preview */
+    .preview-content p {
+      font-size: 1rem;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+      text-align: justify;
+    }
+    
+    .preview-content strong {
+      font-weight: bold;
+    }
+
+    .preview-content .topic_header {
+      background-color: #FFE599;
+      display: block;
+      font-weight: bold;
+      line-height: 1.2;
+      margin: 20px 0 10px 0;
+      text-align: left;
+      padding-left: 5px;
+      padding-top: 10px;
+      padding-right: 10px;
+      padding-bottom: 10px;
+      text-transform: uppercase;
+      color: #000;
+    }
+
+    .preview-content .subtopic_header {
+      text-align: left;
+      line-height: 1.2;
+      margin-top: 15px;
+      font-weight: bold;
+      color: #0070C0;
+      border-bottom: 4px solid #FFC000;
+      padding-bottom: 4px;
+      margin-bottom: 15px;
+    }
+
+    .preview-content .rounded_div {
+      border-radius: 20px;
+      border: 3px solid #3579D5;
+      padding: 15px;
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
+
+    .preview-content .syllabus_header {
+      color: black;
+      display: block;
+      font-size: 1.5em;
+      font-weight: bold;
+      line-height: 1.3;
+      text-align: center;
+      margin: 0;
+    }
+
+    .preview-content .author_qualification {
+      margin-top: 5px;
+      display: block;
+      font-size: 0.9em;
+      font-weight: bold;
+      line-height: 1.2;
+      text-align: center;
+      color: #555;
+    }
+
+    .preview-content .table_ {
+      border-collapse: collapse;
+      width: 100%;
+      border: black solid 1pt;
+      margin-top: 15px;
+      margin-bottom: 15px;
+    }
+
+    .preview-content .td_ {
+      background-color: transparent;
+      padding: 8px;
+      border: black solid 1pt;
+      font-size: 0.9rem;
+    }
+
+    .preview-content .td_1 {
+      font-weight: bold;
+      background-color: #B7DEE8;
+      padding: 8px;
+      border: black solid 1pt;
+      font-size: 0.9rem;
+    }
+
+    .preview-content .border_box {
+      border: 1px solid #0070C0;
+      padding: 12px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+    }
+
+    .preview-content .formula {
+      text-align: center;
+      font-weight: bold;
+      margin: 12px 0;
+      display: block;
+    }
+
+    .preview-content .chapter_header {
+      width: 100%;
+      border-collapse: collapse;
+      border: black solid 1pt;
+    }
+
+    .preview-content .td_unit_no {
+      background-color: #a1a8b3;
+      padding: 5px;
+      border: black solid 1pt;
+    }
+
+    .preview-content .unit_no_text {
+      font-size: 1.2em;
+      margin: 0;
+      font-weight: bold;
+    }
+
+    .preview-content .chap_name {
+      font-size: 1.1em;
+      font-weight: bold;
+      padding: 8px;
+      margin: 0;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .preview-content .td_chap_name {
+      border: black solid 1pt;
+    }
+
+    .preview-content .chapter_end {
+      text-align: center;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+
+    /* MCQ quiz preview styles */
+    .preview-content .question {
+      margin-bottom: 15px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background-color: #fcfcfc;
+    }
+
+    .preview-content .question h3 {
+      margin-top: 0;
+      color: #0070C0;
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+
+    .preview-content .answer {
+      margin-top: 8px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    
+    .preview-content .answer.correct { color: var(--success); }
+    .preview-content .answer.incorrect { color: var(--error); }
+
+    /* Notification Toasts */
+    .toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 100;
+    }
+
+    .toast {
+      background: var(--bg-surface);
+      border-left: 4px solid var(--primary);
+      color: var(--text-main);
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 250px;
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .toast.show {
+      transform: translateX(0);
+    }
+
+    .toast.success { border-left-color: var(--success); }
+    .toast.error { border-left-color: var(--error); }
+    .toast.warning { border-left-color: var(--warning); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">
+        <i class="fa-solid fa-book-open-reader"></i>
+      </div>
+      <div class="logo-text">
+        <h1>Semantic Digital Publisher</h1>
+        <p>Interactive EPUB Processing Pipeline</p>
+      </div>
+    </div>
+    
+    <div class="key-container" style="display: flex; align-items: center; gap: 8px;">
+      <i class="fa-solid fa-key" style="color: var(--primary);"></i>
+      <input type="password" id="global-api-key" class="form-control" style="width: 250px; padding: 6px 12px; font-size: 0.85rem;" placeholder="Enter Groq/OpenAI API Key..." oninput="saveApiKey(this.value)">
+    </div>
+    
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchView('ingest')">
+        <i class="fa-solid fa-cloud-arrow-up"></i> Ingest Document
+      </button>
+      <button class="tab-btn" onclick="switchView('explorer')">
+        <i class="fa-solid fa-folder-open"></i> Manage Books
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- INGEST VIEW -->
+    <div id="ingest-view" class="app-view active">
+      <div class="upload-card">
+        <div class="upload-card-header">
+          <h2>Convert Word to EPUB</h2>
+          <p>Drag and drop any formatted Word document (.docx) to compile it into a premium EPUB3 textbook.</p>
+        </div>
+        
+        <form id="upload-form" onsubmit="handleUpload(event)">
+          <div class="dropzone-container" onclick="document.getElementById('file-input').click()" ondragover="dragOverHandler(event)" ondragleave="dragLeaveHandler(event)" ondrop="dropHandler(event)">
+            <i class="fa-solid fa-file-word"></i>
+            <h3>Choose a Word Document</h3>
+            <p>Drag & drop file here or click to browse</p>
+            <input type="file" id="file-input" class="file-input" accept=".docx" onchange="fileSelectedHandler(event)">
+          </div>
+          
+          <div id="file-badge" class="selected-file-badge">
+            <span id="file-badge-name">document.docx</span>
+            <i class="fa-solid fa-xmark" onclick="removeSelectedFile(event)"></i>
+          </div>
+
+          
+          <button type="submit" class="btn-submit" style="margin-top: 2rem; width: 100%;">
+            <i class="fa-solid fa-circle-play"></i> Ingest & Compile
+          </button>
+        </form>
+        
+        <!-- Background execution progress logs -->
+        <div id="progress-box" class="ingest-progress-container">
+          <div class="progress-meta">
+            <span id="progress-status-label">Extracting document...</span>
+            <span id="progress-percent-label">0%</span>
+          </div>
+          <div class="progress-bar-wrapper">
+            <div id="progress-bar-fill" class="progress-bar-fill"></div>
+          </div>
+          <div id="console-logger" class="console-logger">Logs: Pipeline initialized.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCUMENT EXPLORER VIEW -->
+    <div id="explorer-view" class="app-view">
+      <div class="explorer-header">
+        <h2>Your Library</h2>
+        <button class="btn-action" onclick="fetchDocuments()">
+          <i class="fa-solid fa-rotate"></i> Refresh
+        </button>
+      </div>
+      
+      <div id="documents-grid" class="doc-grid">
+        <!-- Document cards will render here dynamically -->
+      </div>
+    </div>
+
+    <!-- EDIT / REVIEW VIEW -->
+    <div id="edit-view" class="app-view">
+      <!-- Section Tree Sidebar -->
+      <div class="edit-sidebar">
+        <div class="sidebar-header">
+          <h3>Chapters & Topics</h3>
+          <button class="btn-sidebar-back" onclick="switchView('explorer')">
+            <i class="fa-solid fa-angle-left"></i> Back
+          </button>
+        </div>
+        <div id="sections-list" class="section-tree-list">
+          <!-- Sections will load here -->
+        </div>
+      </div>
+      
+      <!-- Editor Workspace -->
+      <div class="editor-container">
+        <!-- Editor header toolbar -->
+        <div class="editor-header-bar">
+          <div id="editor-title" class="editor-doc-title">Select a Section to Begin Editing</div>
+          <div class="editor-actions">
+            <button id="btn-save-section" class="btn-action btn-accent-save" onclick="saveSectionContent()" disabled>
+              <i class="fa-solid fa-floppy-disk"></i> Save Content
+            </button>
+            <button id="btn-recompile-book" class="btn-action btn-compile" onclick="recompileBook()" disabled>
+              <i class="fa-solid fa-arrows-spin"></i> Recompile EPUB
+            </button>
+            <button id="btn-download-epub" class="btn-action btn-download" onclick="downloadEpub()" disabled>
+              <i class="fa-solid fa-download"></i> Download EPUB
+            </button>
+          </div>
+        </div>
+        
+        <!-- Dual Pane Layout -->
+        <div class="editor-workspace">
+          <!-- Markdown Editor Pane -->
+          <div class="markdown-pane">
+            <div class="pane-header">
+              <span>MARKDOWN SOURCE EDITOR</span>
+              <span id="lbl-status" style="font-weight: normal;">No Section Loaded</span>
+            </div>
+            <textarea id="markdown-textarea" class="editor-textarea" oninput="triggerPreviewRender()" placeholder="Validated Markdown content will load here..." disabled></textarea>
+          </div>
+          
+          <!-- Live EPUB Preview Pane -->
+          <div class="preview-pane">
+            <div class="pane-header">
+              <span>LIVE EPUB BOOK PREVIEW</span>
+              <span>Styled Elements View</span>
+            </div>
+            <div id="html-preview" class="preview-content" style="background-color: white;">
+              <p style="color: #666; font-style: italic; text-align: center; margin-top: 100px;">
+                Select a section from the sidebar to view the rendered preview.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Notification Toasts -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Developer Attribution Footer -->
+  <div style="position: fixed; bottom: 12px; right: 24px; font-size: 0.75rem; color: var(--text-muted); z-index: 90; font-family: var(--font-inter); background: rgba(15, 23, 42, 0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px; pointer-events: auto;">
+    <i class="fa-solid fa-code" style="color: var(--primary);"></i>
+    <span>Core pipeline designed &amp; developed by <a href="https://github.com/Aaaaaaaayush" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600; transition: color 0.2s ease;" onmouseover="this.style.color='var(--primary-hover)'" onmouseout="this.style.color='var(--primary)'">Aayush</a></span>
+  </div>
+
+  <script>
+    let activeDocumentId = null;
+    let activeSectionId = null;
+    let selectedFile = null;
+    let pollInterval = null;
+    let previewDebounce = null;
+
+    // Load API Key on Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedKey = localStorage.getItem('user_api_key') || '';
+      document.getElementById('global-api-key').value = savedKey;
+    });
+
+    function saveApiKey(val) {
+      localStorage.setItem('user_api_key', val.trim());
+    }
+
+    // View Routing
+    function switchView(viewName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.app-view').forEach(view => view.classList.remove('active'));
+      
+      const targetView = document.getElementById(`${viewName}-view`);
+      if (targetView) targetView.classList.add('active');
+      
+      // Update header buttons state
+      if (viewName === 'ingest') {
+        document.querySelector('button[onclick*="ingest"]').classList.add('active');
+      } else if (viewName === 'explorer') {
+        document.querySelector('button[onclick*="explorer"]').classList.add('active');
+        fetchDocuments();
+      } else if (viewName === 'edit') {
+        // Keeps state
+      }
+    }
+
+    // Toast Notifications
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      
+      let icon = 'info';
+      if (type === 'success') icon = 'circle-check';
+      else if (type === 'error') icon = 'triangle-exclamation';
+      else if (type === 'warning') icon = 'circle-exclamation';
+      
+      toast.innerHTML = `<i class="fa-solid fa-${icon}"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      
+      // Force layout calculation
+      toast.offsetHeight;
+      toast.classList.add('show');
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // FILE UPLOAD & INGEST DRAG-DROP
+    function dragOverHandler(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('drag-over');
+    }
+
+    function dragLeaveHandler(e) {
+      e.currentTarget.classList.remove('drag-over');
+    }
+
+    function dropHandler(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      if (e.dataTransfer.files.length > 0) {
+        selectedFile = e.dataTransfer.files[0];
+        updateFileBadge();
+      }
+    }
+
+    function fileSelectedHandler(e) {
+      if (e.target.files.length > 0) {
+        selectedFile = e.target.files[0];
+        updateFileBadge();
+      }
+    }
+
+    function updateFileBadge() {
+      const badge = document.getElementById('file-badge');
+      const name = document.getElementById('file-badge-name');
+      const docTitleInput = document.getElementById('doc-title');
+      
+      if (selectedFile) {
+        name.textContent = selectedFile.name;
+        badge.style.display = 'flex';
+        
+        // Auto-fill title with capitalized filename
+        if (!docTitleInput.value) {
+          let cleanName = selectedFile.name.replace(/\.[^/.]+$/, ""); // strip extension
+          cleanName = cleanName.replace(/[-_]/g, " "); // replace dashes/underscores
+          docTitleInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        }
+      }
+    }
+
+    function removeSelectedFile(e) {
+      e.stopPropagation();
+      selectedFile = null;
+      document.getElementById('file-badge').style.display = 'none';
+      document.getElementById('file-input').value = '';
+    }
+
+    // Ingest Upload pipeline handler
+    async function handleUpload(e) {
+      e.preventDefault();
+      if (!selectedFile) {
+        showToast("Please choose a Word file to upload.", "warning");
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      const apiKey = localStorage.getItem('user_api_key') || '';
+      if (apiKey) {
+        formData.append("api_key", apiKey);
+      }
+      
+      const progressBox = document.getElementById('progress-box');
+      const consoleLog = document.getElementById('console-logger');
+      const barFill = document.getElementById('progress-bar-fill');
+      const statusLabel = document.getElementById('progress-status-label');
+      const percentLabel = document.getElementById('progress-percent-label');
+      
+      progressBox.style.display = 'flex';
+      consoleLog.textContent = "Pipeline logs:\nUploading file and initializing metadata...";
+      barFill.style.width = '5%';
+      statusLabel.textContent = "Uploading document...";
+      percentLabel.textContent = "5%";
+      
+      try {
+        const response = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const err = await response.json();
+          let msg = "Ingestion failed";
+          if (err && err.detail) {
+            if (typeof err.detail === "string") {
+              msg = err.detail;
+            } else if (Array.isArray(err.detail)) {
+              msg = err.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join(', ');
+            } else {
+              msg = JSON.stringify(err.detail);
+            }
+          }
+          throw new Error(msg);
+        }
+        
+        const data = await response.json();
+        const docId = data.document_id;
+        
+        showToast("Document uploaded! Ingesting...", "success");
+        consoleLog.textContent += `\nDocument registered with UUID: ${docId}.\nExecuting segmentation splitting...`;
+        
+        // Poll status
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(() => checkIngestStatus(docId), 2000);
+        
+      } catch (err) {
+        showToast(err.message, "error");
+        consoleLog.textContent += `\nERROR: ${err.message}`;
+        statusLabel.textContent = "Upload failed.";
+        barFill.style.width = '0%';
+        percentLabel.textContent = '0%';
+      }
+    }
+
+    async function checkIngestStatus(docId) {
+      const consoleLog = document.getElementById('console-logger');
+      const barFill = document.getElementById('progress-bar-fill');
+      const statusLabel = document.getElementById('progress-status-label');
+      const percentLabel = document.getElementById('progress-percent-label');
+      
+      try {
+        const response = await fetch(`/api/documents/${docId}/status`);
+        if (!response.ok) throw new Error("Could not check pipeline status.");
+        
+        const data = await response.json();
+        
+        if (data.status === "processing") {
+          barFill.style.width = `${data.progress}%`;
+          percentLabel.textContent = `${data.progress}%`;
+          statusLabel.textContent = "Structuring & AI styling...";
+          consoleLog.textContent = `Pipeline logs:\nProcessing database sections... (${data.progress}% done)\nAI formatting formatting agent resolving structural jumping issues...`;
+        } else if (data.status === "completed") {
+          clearInterval(pollInterval);
+          barFill.style.width = '100%';
+          percentLabel.textContent = '100%';
+          statusLabel.textContent = "Conversion Complete!";
+          consoleLog.textContent = `Pipeline logs:\nSuccess! Final EPUB file compiled:\n${data.epub_path}\nFile copied to root workspace folder.`;
+          showToast("EPUB converted successfully!", "success");
+          
+          // Switch to explorer tab automatically
+          setTimeout(() => {
+            switchView('explorer');
+            // Clean forms
+            document.getElementById('upload-form').reset();
+            removeSelectedFile({stopPropagation: () => {}});
+            progressBox.style.display = 'none';
+          }, 2000);
+          
+        } else if (data.status === "failed") {
+          clearInterval(pollInterval);
+          barFill.style.width = '0%';
+          percentLabel.textContent = '0%';
+          statusLabel.textContent = "Processing failed.";
+          consoleLog.textContent = `Pipeline logs:\nFAIL!\nError detail:\n${data.error}`;
+          showToast("Pipeline conversion failed.", "error");
+        }
+      } catch (err) {
+        clearInterval(pollInterval);
+        showToast(err.message, "error");
+      }
+    }
+
+    // MANAGE BOOKS / EXPLORER LIBRARY
+    async function fetchDocuments() {
+      const grid = document.getElementById('documents-grid');
+      grid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Loading library documents...</p>';
+      
+      try {
+        const response = await fetch('/api/documents');
+        if (!response.ok) throw new Error("Could not load library.");
+        
+        const docs = await response.json();
+        if (docs.length === 0) {
+          grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
+              <i class="fa-solid fa-box-open" style="font-size: 3rem; margin-bottom: 1rem; color: #475569;"></i>
+              <p>Your library is empty. Upload a Word file to begin.</p>
+            </div>`;
+          return;
+        }
+        
+        grid.innerHTML = '';
+        docs.forEach(doc => {
+          const card = document.createElement('div');
+          card.className = 'doc-card';
+          
+          const dateStr = new Date(doc.created_at).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          
+          card.innerHTML = `
+            <div class="doc-card-title" title="${doc.title}">${doc.title}</div>
+            <div class="doc-card-meta">
+              <span><i class="fa-solid fa-pen-nib"></i> Author: <strong>${doc.author}</strong></span>
+              <span><i class="fa-solid fa-calendar-day"></i> Ingested: ${dateStr}</span>
+              <span><i class="fa-solid fa-sitemap"></i> Database Nodes: ${doc.section_count} sections</span>
+            </div>
+            <div class="doc-card-actions">
+              <button class="btn-card btn-primary-action" onclick="loadDocInEditor('${doc.id}', '${doc.title.replace(/'/g, "\\'")}')">
+                <i class="fa-solid fa-square-pen"></i> Review & Edit
+              </button>
+              <button class="btn-card" onclick="downloadBookDirect('${doc.id}')" ${doc.has_epub ? '' : 'disabled'}>
+                <i class="fa-solid fa-download"></i> EPUB
+              </button>
+              <button class="btn-card btn-delete" onclick="deleteDocument('${doc.id}', '${doc.title.replace(/'/g, "\\'")}')" title="Delete document">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        
+      } catch (err) {
+        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--error);">${err.message}</p>`;
+      }
+    }
+
+    async function deleteDocument(docId, title) {
+      if (!confirm(`Are you sure you want to permanently delete "${title}"? This deletes all parsed SQLite section data and EPUB files.`)) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error("Deletion failed.");
+        
+        showToast("Document deleted successfully", "success");
+        fetchDocuments();
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    }
+
+    function downloadBookDirect(docId) {
+      window.location.href = `/api/documents/${docId}/download`;
+    }
+
+    // EDITOR WORKSPACE - REVIEW & EDIT
+    async function loadDocInEditor(docId, title) {
+      activeDocumentId = docId;
+      activeSectionId = null;
+      
+      // Clean editor UI
+      document.getElementById('markdown-textarea').value = '';
+      document.getElementById('markdown-textarea').disabled = true;
+      document.getElementById('html-preview').innerHTML = `
+        <p style="color: #666; font-style: italic; text-align: center; margin-top: 100px;">
+          Select a section from the sidebar to view the rendered preview.
+        </p>`;
+        
+      document.getElementById('btn-save-section').disabled = true;
+      document.getElementById('btn-recompile-book').disabled = true;
+      document.getElementById('btn-download-epub').disabled = true;
+      
+      document.getElementById('editor-title').textContent = title;
+      document.getElementById('lbl-status').textContent = "No Section Selected";
+      
+      // Open tab
+      switchView('edit');
+      
+      // Fetch sections list
+      const listContainer = document.getElementById('sections-list');
+      listContainer.innerHTML = '<p style="text-align: center; padding: 1rem; color: var(--text-muted);">Loading sections...</p>';
+      
+      try {
+        const response = await fetch(`/api/documents/${docId}/sections`);
+        if (!response.ok) throw new Error("Could not retrieve document structure.");
+        
+        const sections = await response.json();
+        listContainer.innerHTML = '';
+        
+        sections.forEach(sec => {
+          const item = document.createElement('div');
+          item.className = `section-node section-level-${sec.level}`;
+          item.id = `sec-node-${sec.id}`;
+          
+          let icon = 'fa-file-lines';
+          if (sec.section_type === 'chapter') icon = 'fa-bookmark';
+          else if (sec.section_type === 'book') icon = 'fa-book';
+          
+          const cleanTitle = sec.title || `Unnamed Section (Level ${sec.level})`;
+          
+          item.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${cleanTitle}</span>`;
+          item.onclick = () => loadSectionContent(sec.id, cleanTitle);
+          listContainer.appendChild(item);
+        });
+        
+        // Active buttons for recompile/download
+        document.getElementById('btn-recompile-book').disabled = false;
+        document.getElementById('btn-download-epub').disabled = false;
+        
+      } catch (err) {
+        listContainer.innerHTML = `<p style="color: var(--error); padding: 1rem; font-size: 0.8rem;">${err.message}</p>`;
+      }
+    }
+
+    async function loadSectionContent(sectionId, title) {
+      activeSectionId = sectionId;
+      
+      // Toggle nodes styling class
+      document.querySelectorAll('.section-node').forEach(node => node.classList.remove('active'));
+      const activeNode = document.getElementById(`sec-node-${sectionId}`);
+      if (activeNode) activeNode.classList.add('active');
+      
+      document.getElementById('editor-title').textContent = title;
+      document.getElementById('lbl-status').textContent = "Loading content...";
+      
+      const textarea = document.getElementById('markdown-textarea');
+      const preview = document.getElementById('html-preview');
+      
+      textarea.disabled = true;
+      textarea.value = '';
+      
+      try {
+        const response = await fetch(`/api/sections/${sectionId}`);
+        if (!response.ok) throw new Error("Could not load section data.");
+        
+        const data = await response.json();
+        
+        textarea.value = data.markdown;
+        textarea.disabled = false;
+        
+        preview.innerHTML = data.html_preview;
+        document.getElementById('btn-save-section').disabled = false;
+        document.getElementById('lbl-status').textContent = `Status: ${data.processing_status.toUpperCase()}`;
+        
+      } catch (err) {
+        showToast(err.message, "error");
+        document.getElementById('lbl-status').textContent = "Load failed.";
+      }
+    }
+
+    // Trigger local client markdown changes preview compilation debounced
+    function triggerPreviewRender() {
+      document.getElementById('lbl-status').textContent = "Editing... (Unsaved Changes)";
+      
+      // Debounce logic for real-time local updates
+      if (previewDebounce) clearTimeout(previewDebounce);
+      previewDebounce = setTimeout(async () => {
+        const text = document.getElementById('markdown-textarea').value;
+        // Simple markdown preview parser locally in iframe or text.
+        // But to keep rendering identical to Epub compile, we compile backend-side on save
+      }, 500);
+    }
+
+    async function saveSectionContent() {
+      if (!activeSectionId) return;
+      
+      const markdown = document.getElementById('markdown-textarea').value;
+      const saveBtn = document.getElementById('btn-save-section');
+      
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+      
+      try {
+        const response = await fetch(`/api/sections/${activeSectionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ validated_markdown: markdown })
+        });
+        
+        if (!response.ok) throw new Error("Could not save changes.");
+        
+        const data = await response.json();
+        
+        document.getElementById('html-preview').innerHTML = data.html_preview;
+        document.getElementById('lbl-status').textContent = "Status: VALIDATED (Saved)";
+        showToast("Section changes saved successfully!", "success");
+        
+      } catch (err) {
+        showToast(err.message, "error");
+        document.getElementById('lbl-status').textContent = "Save failed.";
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Content';
+      }
+    }
+
+    async function recompileBook() {
+      if (!activeDocumentId) return;
+      
+      const compileBtn = document.getElementById('btn-recompile-book');
+      compileBtn.disabled = true;
+      compileBtn.innerHTML = '<i class="fa-solid fa-arrows-spin fa-spin"></i> Recompiling...';
+      
+      const formData = new FormData();
+      const apiKey = localStorage.getItem('user_api_key') || '';
+      if (apiKey) {
+        formData.append("api_key", apiKey);
+      }
+      
+      try {
+        const response = await fetch(`/api/documents/${activeDocumentId}/recompile`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || "Recompilation failed.");
+        }
+        
+        const data = await response.json();
+        showToast(data.message, "success");
+        
+      } catch (err) {
+        showToast(err.message, "error");
+      } finally {
+        compileBtn.disabled = false;
+        compileBtn.innerHTML = '<i class="fa-solid fa-arrows-spin"></i> Recompile EPUB';
+      }
+    }
+
+    function downloadEpub() {
+      if (!activeDocumentId) return;
+      downloadBookDirect(activeDocumentId);
+    }
+  </script>
+</body>
+</html>

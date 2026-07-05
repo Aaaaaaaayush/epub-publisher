@@ -1,0 +1,30 @@
+# Tasks
+
+- `[/]` Step 1: Project Directory Structure and Configuration
+  - `[x]` Create requirements.txt and project layout (local venv initialized and packages installed)
+  - `[ ]` Setup environment config and logger
+- `[ ]` Step 2: SQLite Schema and Database Layer
+  - `[ ]` Setup SQLAlchemy base and sessionmaker
+  - `[ ]` Define Document and Section models
+- `[ ]` Step 3: Deterministic DOCX Extraction Engine
+  - `[ ]` Build paragraph and table reading-order iterator
+  - `[ ]` Implement robust list preservation logic with support for circle & hollow bullets
+  - `[ ]` Implement table-to-markdown converter
+- `[ ]` Step 4: Logical Section Splitter
+  - `[ ]` Build heading-based content splitter
+  - `[ ]` Store structured nodes in SQLite database
+- `[ ]` Step 5: Prompts and AI Agents
+  - `[ ]` Write LLM prompts for structure, formatting, and validation
+  - `[ ]` Implement Structure Agent (hierarchy repair)
+  - `[ ]` Implement Formatting Agent (markdown normalization)
+- `[ ]` Step 6: Validation Agent & Loop
+  - `[ ]` Implement deterministic syntax and length checks
+  - `[ ]` Implement AI semantic similarity verification
+  - `[ ]` Add retry-formatting closed loop in the pipeline coordinator
+- `[ ]` Step 7: Markdown-to-HTML & EPUB Generator
+  - `[ ]` Implement Markdown-to-HTML renderer via markdown-it-py
+  - `[ ]` Build EbookLib EPUB compiler with hierarchical Table of Contents and custom CSS styles (outer bullet = filled circle, nested bullet = hollow circle)
+- `[ ]` Step 8: Integration and Verification
+  - `[ ]` Create pipeline CLI script
+  - `[ ]` Implement test suite with pytest
+  - `[ ]` Perform validation run with a test docx file
