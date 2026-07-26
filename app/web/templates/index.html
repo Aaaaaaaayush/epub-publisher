@@ -1063,7 +1063,7 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Developer Attribution Footer -->
-  <div style="position: fixed; bottom: 12px; right: 24px; font-size: 0.75rem; color: var(--text-muted); z-index: 90; font-family: var(--font-inter); background: rgba(15, 23, 42, 0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px; pointer-events: auto;">
+  <div id="dev-attribution-footer" style="position: fixed; bottom: 12px; right: 24px; font-size: 0.75rem; color: var(--text-muted); z-index: 90; font-family: var(--font-inter); background: rgba(15, 23, 42, 0.6); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px; pointer-events: auto;">
     <i class="fa-solid fa-code" style="color: var(--primary);"></i>
     <span>Core pipeline designed &amp; developed by <a href="https://github.com/Aaaaaaaayush" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600; transition: color 0.2s ease;" onmouseover="this.style.color='var(--primary-hover)'" onmouseout="this.style.color='var(--primary)'">Aayush</a></span>
   </div>
@@ -1101,6 +1101,11 @@
         fetchDocuments();
       } else if (viewName === 'edit') {
         // Keeps state
+      }
+
+      const footer = document.getElementById('dev-attribution-footer');
+      if (footer) {
+        footer.style.display = viewName === 'edit' ? 'none' : 'flex';
       }
     }
 
