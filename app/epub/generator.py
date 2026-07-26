@@ -21,50 +21,9 @@ class MarkdownToHtmlConverter:
         # Initialize markdown-it-py and enable GFM-like tables, set breaks to True
         self.md = MarkdownIt("commonmark", {"breaks": True}).enable("table")
         
-    def convert(self, markdown_text: str, convert_math: bool = True) -> str:
+    def convert(self, markdown_text: str) -> str:
         if not markdown_text:
             return ""
-            
-        if convert_math:
-            try:
-                import latex2mathml.converter
-                
-                display_math_re = re.compile(r'\$\$(.*?)\$\$', re.DOTALL)
-                inline_math_re = re.compile(r'(?<!\\)\$((?:[^\$\s])|(?:[^\$\s][^\$]*?[^\$\s]))(?<!\\)\$')
-                
-                def replace_display(match):
-                    latex_str = match.group(1).strip()
-                    if not latex_str:
-                        return ""
-                    latex_str = latex_str.replace('\\\\', '\\')
-                    try:
-                        mathml = latex2mathml.converter.convert(latex_str)
-                        mathml = re.sub(r'<math[^>]*>', '<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML" displaystyle="true">', mathml)
-                        return f"\n<div class=\"math-display\">\n{mathml}\n</div>\n"
-                    except Exception as e:
-                        logger.error(f"latex2mathml failed on display math: {latex_str}. Error: {e}")
-                        return match.group(0)
-                        
-                def replace_inline(match):
-                    latex_str = match.group(1).strip()
-                    if not latex_str:
-                        return ""
-                    latex_str = latex_str.replace('\\\\', '\\')
-                    try:
-                        mathml = latex2mathml.converter.convert(latex_str)
-                        mathml = re.sub(r'<math[^>]*>', '<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML" displaystyle="true">', mathml)
-                        return mathml
-                    except Exception as e:
-                        logger.error(f"latex2mathml failed on inline math: {latex_str}. Error: {e}")
-                        return match.group(0)
-                        
-                # Perform replacements
-                markdown_text = display_math_re.sub(replace_display, markdown_text)
-                markdown_text = inline_math_re.sub(replace_inline, markdown_text)
-                
-            except Exception as e:
-                logger.error(f"Failed to run latex2mathml conversion: {e}")
-                
         return self.md.render(markdown_text)
 
 
@@ -120,7 +79,6 @@ def parse_option_line(line):
         text = alpha_match.group(2).strip()
         text = re.sub(r'[*)]+$', '', text).strip()
         text = re.sub(r'^[*(\s]+', '', text).strip()
-        text = text.replace('\\[', '[').replace('\\]', ']').replace('\\(', '(').replace('\\)', ')')
         return letter, text
         
     # 2. Match numerical options: 1., 2), (3)
@@ -132,22 +90,18 @@ def parse_option_line(line):
             text = num_match.group(2).strip()
             text = re.sub(r'[*)]+$', '', text).strip()
             text = re.sub(r'^[*(\s]+', '', text).strip()
-            text = text.replace('\\[', '[').replace('\\]', ']').replace('\\(', '(').replace('\\)', ')')
             return letter, text
             
     return None
 
 
 def parse_mcq_markdown(text):
-    # Preprocess same-line options to newlines
-    text = re.sub(r'(\s|\\\]|\]|\))([a-hA-H])[\s]*[).]\s+', r'\1\n\2) ', text)
-    
     questions = []
     lines = text.split('\n')
     current_q = None
     
     # Match standard question prefixes: 1. or (1) or 1)
-    q_start_re = re.compile(r'^\s*(?:Q)?\(?(\d+)\)?[\s\.\)]+\s*(.*)', re.IGNORECASE)
+    q_start_re = re.compile(r'^\s*\(?(\d+)\)?[\s\.\)]+\s*(.*)')
     ans_re = re.compile(r'(?i)^\s*\*?\*?Ans(?:wer)?\b[*:\. \s-]*\(?([a-zA-Z0-9])\)?')
     
     for line in lines:
@@ -188,7 +142,6 @@ def parse_mcq_markdown(text):
                 questions.append(current_q)
             q_num = int(q_match.group(1))
             q_text = q_match.group(2).strip()
-            q_text = q_text.replace('\\[', '[').replace('\\]', ']').replace('\\(', '(').replace('\\)', ')')
             current_q = {
                 "number": q_num,
                 "question": q_text,
@@ -199,8 +152,7 @@ def parse_mcq_markdown(text):
             
         if current_q and not current_q["options"] and current_q["answer"] is None:
             if not re.match(r'(?i)(?:answer|answers|answer\s+key)', line_str):
-                line_clean = line_str.replace('\\[', '[').replace('\\]', ']').replace('\\(', '(').replace('\\)', ')')
-                current_q["question"] += " " + line_clean
+                current_q["question"] += " " + line_str
                 
     if current_q:
         questions.append(current_q)
@@ -365,111 +317,6 @@ def parse_tf_markdown(text):
     return questions
 
 
-def parse_fitb_markdown(text):
-    questions = []
-    lines = text.split('\n')
-    current_q = None
-    
-    q_start_re = re.compile(r'^\s*(?:Q)?(?:\((\d+)\)|(\d+)[.)]\s*)\s*(.*)')
-    ans_comment_re = re.compile(r'(?i)<!--\s*ANSWER\s*:\s*(.*?)\s*-->')
-    
-    for line in lines:
-        line_str = line.strip()
-        if not line_str:
-            continue
-            
-        q_match = q_start_re.match(line_str)
-        if q_match:
-            if current_q:
-                questions.append(current_q)
-            q_num = int(q_match.group(1) or q_match.group(2))
-            q_text = q_match.group(3).strip()
-            current_q = {
-                "number": q_num,
-                "question": q_text,
-                "answer": None
-            }
-            continue
-            
-        ans_match = ans_comment_re.search(line_str)
-        if ans_match and current_q:
-            current_q["answer"] = ans_match.group(1).strip()
-            continue
-            
-        if current_q and current_q["answer"] is None:
-            ans_inline = ans_comment_re.search(line_str)
-            if ans_inline:
-                current_q["answer"] = ans_inline.group(1).strip()
-                line_str = ans_comment_re.sub('', line_str).strip()
-            if line_str:
-                current_q["question"] += " " + line_str
-                
-    if current_q:
-        questions.append(current_q)
-        
-    return questions
-
-
-def parse_mtc_markdown(text):
-    lines = text.split('\n')
-    
-    left_items = []
-    right_items = []
-    
-    row_re = re.compile(r'^\s*(\d+)\.?\s*(.*?)\s*\|\s*([a-zA-Z])\.?\s*(.*)')
-    ans_comment_re = re.compile(r'(?i)<!--\s*ANSWER\s*:\s*(.*?)\s*-->')
-    
-    mappings = {}
-    
-    for line in lines:
-        line_str = line.strip()
-        if not line_str:
-            continue
-            
-        row_match = row_re.match(line_str)
-        if row_match:
-            num = int(row_match.group(1))
-            left_text = row_match.group(2).strip()
-            letter = row_match.group(3).lower()
-            right_text = row_match.group(4).strip()
-            
-            left_items.append((num, left_text))
-            right_items.append((letter, right_text))
-            continue
-            
-        ans_match = ans_comment_re.search(line_str)
-        if ans_match:
-            ans_str = ans_match.group(1).strip()
-            pairs = re.findall(r'(\d+)\s*[\-\:]\s*([a-zA-Z])', ans_str)
-            for num_str, let_str in pairs:
-                mappings[int(num_str)] = let_str.lower()
-                
-    if not mappings:
-        for idx, (num, _) in enumerate(left_items):
-            letter = chr(ord('a') + idx)
-            mappings[num] = letter
-            
-    left_options = []
-    for num, text in left_items:
-        left_options.append({
-            "match_id": num,
-            "text": text
-        })
-        
-    right_options = []
-    rev_mappings = {v: k for k, v in mappings.items()}
-    for letter, text in right_items:
-        match_id = rev_mappings.get(letter, 1)
-        right_options.append({
-            "match_id": match_id,
-            "text": text
-        })
-        
-    return {
-        "left": left_options,
-        "right": right_options
-    }
-
 
 def format_case_studies(text: str) -> str:
     lines = text.split('\n')
@@ -574,8 +421,6 @@ class EpubGenerator:
         self.db = db
         self.converter = MarkdownToHtmlConverter()
         self.api_key = api_key
-        self.dynamic_images = []
-        self.generated_css_classes = {}
         
     def _get_descendant_sections(self, parent_id: str) -> list[Section]:
         descendants = []
@@ -604,6 +449,7 @@ class EpubGenerator:
         html = re.sub(r"Total\s+Cost\s+Profit\s+Margin\s*%", "Total Cost × Profit Margin %", html, flags=re.IGNORECASE)
         # 5. Standardize spaces around operators in math formulas
         html = re.sub(r"Total\s*Cost\s*\+\s*\(", "Total Cost + (", html, flags=re.IGNORECASE)
+        html = re.sub(r"Total\s*Cost\s*(?:×|\*|\\times)?\s*Profit\s*Margin\s*%", "Total Cost × Profit Margin %", html, flags=re.IGNORECASE)
         html = re.sub(r"Selling\s*Price\s*=\s*", "Selling Price = ", html, flags=re.IGNORECASE)
         return html
 
@@ -615,20 +461,6 @@ class EpubGenerator:
         html_content = self.clean_math_in_html(html_content)
         soup = BeautifulSoup(html_content, "html.parser")
         
-        # Helper to parse inline styles into a dict
-        def parse_inline_style(style_str):
-            if not style_str:
-                return {}
-            styles = {}
-            for item in style_str.split(";"):
-                if ":" in item:
-                    try:
-                        k, v = item.split(":", 1)
-                        styles[k.strip().lower()] = v.strip()
-                    except Exception:
-                        pass
-            return styles
-
         # 0. Format inline bold paragraphs starting with letter prefixes (e.g., A., B., C.) as blue underlines
         for p in list(soup.find_all("p")):
             strong = p.find("strong", recursive=False)
@@ -676,181 +508,28 @@ class EpubGenerator:
                 table.replace_with(div)
                 logger.info("EpubGenerator: Replaced single-column layout table with paragraphs.")
 
-        # 3. Table styling compilation & inline attribute stripping
-        def compile_styles_to_class(tag, category):
-            style_str = tag.get("style", "")
-            styles = parse_inline_style(style_str)
-            
-            # Read presentation attributes
-            if tag.get("bgcolor"):
-                styles["background-color"] = tag.get("bgcolor")
-            if tag.get("width"):
-                styles["width"] = tag.get("width")
-            if tag.get("height"):
-                styles["height"] = tag.get("height")
-            if tag.get("align"):
-                styles["text-align"] = tag.get("align")
-            if tag.get("valign"):
-                styles["vertical-align"] = tag.get("valign")
-            if tag.get("border"):
-                styles["border"] = f"{tag.get('border')}px solid black"
-                
-            # Filter out font name/size and line spacing
-            filtered_styles = {}
-            for k, v in styles.items():
-                if k not in ["font-family", "font-size", "line-height", "font-name", "line-spacing"]:
-                    filtered_styles[k] = v
-                    
-            if not filtered_styles:
-                return None
-                
-            sorted_style = tuple(sorted(filtered_styles.items()))
-            
-            # Check if this exact style combination already exists
-            for cls_name, cls_style in self.generated_css_classes.items():
-                if cls_style == sorted_style:
-                    return cls_name
-                    
-            # Generate new class
-            idx = len(self.generated_css_classes) + 1
-            cls_name = f"epub-{category}-{idx}"
-            self.generated_css_classes[cls_name] = sorted_style
-            return cls_name
-
+        # 3. Add table classes
         for table in soup.find_all("table"):
-            # Keep table custom classes (like tb-table-blue, table_)
-            cls_list = table.get("class", [])
-            if isinstance(cls_list, str):
-                cls_list = [cls_list]
-            tb_custom_classes = [c for c in cls_list if c.startswith("tb-table-")]
+            table["class"] = "table_"
             
-            cls_name = compile_styles_to_class(table, "table")
-            table.attrs = {} # Strip all attributes
-            
-            new_classes = ["table_"]
-            new_classes.extend(tb_custom_classes)
-            if cls_name:
-                new_classes.append(cls_name)
-            table["class"] = new_classes
-            
+            # Highlight only the first header row, make rest white
             rows = table.find_all("tr")
             for r_idx, row in enumerate(rows):
-                cls_name = compile_styles_to_class(row, "row")
-                row.attrs = {} # Strip all attributes
-                if cls_name:
-                    row["class"] = [cls_name]
-                    
                 cells = row.find_all(["th", "td"])
                 for cell in cells:
-                    cell_name = cell.name
-                    cls_name = compile_styles_to_class(cell, "cell")
+                    cell.name = "td"
+                    if r_idx == 0:
+                        cell["class"] = "td_1"
+                    else:
+                        cell["class"] = "td_"
                     
-                    # Keep original formatting classes (td_1, cell-blue, row-blue, row-alt-grey)
-                    orig_cls = cell.get("class", [])
-                    if isinstance(orig_cls, str):
-                        orig_cls = [orig_cls]
-                    keep_cls = [c for c in orig_cls if c.startswith("row-") or c.startswith("cell-") or c == "td_1"]
-                    if r_idx == 0 and "td_1" not in keep_cls:
-                        # Fallback for first row header highlight
-                        keep_cls.append("td_1")
-                    elif r_idx > 0 and "td_" not in keep_cls:
-                        keep_cls.append("td_")
-                        
-                    cell.attrs = {} # Strip all attributes
-                    cell.name = cell_name
-                    
-                    cell_classes = []
-                    if cls_name:
-                        cell_classes.append(cls_name)
-                    cell_classes.extend(keep_cls)
-                    if cell_classes:
-                        cell["class"] = cell_classes
-
-        # 4. Remove spans from table cells unless customized
-        for table in soup.find_all("table"):
-            for cell in table.find_all(["td", "th"]):
-                for span in list(cell.find_all("span")):
-                    has_custom_class = any(c for c in span.get("class", []) if c not in ["MsoNormal", "Apple-converted-space"])
-                    style_str = span.get("style", "")
-                    has_custom_style = False
-                    if style_str:
-                        styles = parse_inline_style(style_str)
-                        custom_keys = [k for k in styles if k in ["color", "background-color", "border", "font-weight", "font-style", "text-decoration"]]
-                        if custom_keys:
-                            has_custom_style = True
-                    if not has_custom_class and not has_custom_style:
-                        span.unwrap()
-
-        # 5. Clean style attributes from spans and list items, mapping customized properties to classes
-        for tag in list(soup.find_all(["span", "li"])):
-            style_str = tag.get("style", "")
-            if style_str:
-                styles = parse_inline_style(style_str)
-                keep_styles = {}
-                for k, v in styles.items():
-                    if k in ["color", "background-color", "font-weight", "font-style", "text-decoration", "border"]:
-                        keep_styles[k] = v
-                
-                # Delete style attribute
-                if "style" in tag.attrs:
-                    del tag.attrs["style"]
-                
-                if keep_styles:
-                    sorted_style = tuple(sorted(keep_styles.items()))
-                    cls_name = None
-                    for name, cls_style in self.generated_css_classes.items():
-                        if cls_style == sorted_style:
-                            cls_name = name
-                            break
-                    if not cls_name:
-                        idx = len(self.generated_css_classes) + 1
-                        category = "span" if tag.name == "span" else "li"
-                        cls_name = f"epub-{category}-{idx}"
-                        self.generated_css_classes[cls_name] = sorted_style
-                    
-                    classes = tag.get("class", [])
-                    if isinstance(classes, str):
-                        classes = [classes]
-                    if cls_name not in classes:
-                        classes.append(cls_name)
-                    tag["class"] = classes
-            else:
-                # Ensure no empty style attributes
-                if "style" in tag.attrs:
-                    del tag.attrs["style"]
-
-        # 6. Extract raw base64 image data and update references
+        # 4. Post-process images
         for img in soup.find_all("img"):
             img["class"] = "img_class"
             if not img.get("alt"):
                 img["alt"] = "image"
                 
-            src = img.get("src", "")
-            if src.startswith("data:image/"):
-                try:
-                    header, base64_data = src.split(",", 1)
-                    mime_type = header.split(";")[0].split(":")[1]
-                    ext = ".png"
-                    if "jpeg" in mime_type or "jpg" in mime_type:
-                        ext = ".jpg"
-                    elif "gif" in mime_type:
-                        ext = ".gif"
-                    
-                    import base64
-                    import hashlib
-                    img_data = base64.b64decode(base64_data)
-                    h = hashlib.md5(img_data).hexdigest()[:8]
-                    filename = f"base64_img_{h}{ext}"
-                    
-                    # Store image bytes for registration in generator spine
-                    self.dynamic_images.append((filename, img_data, mime_type))
-                    img["src"] = f"images/{filename}"
-                except Exception as e:
-                    logger.error(f"EpubGenerator: Failed to extract base64 image: {e}")
-            elif src.startswith("media/"):
-                img["src"] = src.replace("media/", "images/")
-
-        # 7. Smart post-process h3/h4 headers
+        # 5. Smart post-process h3 → topic_header (yellow panel) or subtopic_header (blue underline if letter prefix)
         for h3 in list(soup.find_all("h3")):
             if not h3.get_text().strip():
                 h3.decompose()
@@ -859,21 +538,15 @@ class EpubGenerator:
                 continue
             
             h3_text = h3.get_text().strip()
-            header_class = "topic_header"
-            if re.match(r'^[A-Z]\b', h3_text):
-                header_class = "subtopic_header"
+            # If starts with lettered prefix like A., B., C.
+            if re.match(r'^[A-Z]\.\s', h3_text):
+                p = soup.new_tag("p", attrs={"class": "subtopic_header"})
             else:
-                m = re.match(r'^(\d+(?:\.\d+)+)', h3_text)
-                if m:
-                    prefix = m.group(1)
-                    dots_count = prefix.count('.')
-                    if dots_count >= 2:
-                        header_class = "subtopic_header"
-            
-            p = soup.new_tag("p", attrs={"class": header_class})
+                p = soup.new_tag("p", attrs={"class": "topic_header"})
             p.extend(list(h3.children))
             h3.replace_with(p)
 
+        # 6. Smart post-process h4 → subtopic_header (blue underline)
         for h4 in list(soup.find_all("h4")):
             if not h4.get_text().strip():
                 h4.decompose()
@@ -884,7 +557,7 @@ class EpubGenerator:
             p.extend(list(h4.children))
             h4.replace_with(p)
             
-        # 8. Identify formula paragraphs
+        # 7. Identify formula paragraphs, assign class "formula", and deduplicate consecutive duplicates
         last_text = None
         for p in list(soup.find_all("p")):
             text = p.get_text().strip()
@@ -900,7 +573,7 @@ class EpubGenerator:
                 last_text = normalized_text
                 p["class"] = "formula"
                 
-        # 9. Post-process stray Q&A or metadata code blocks
+        # 8. Post-process stray Q&A or metadata code blocks back to plain text
         for pre in list(soup.find_all("pre")):
             code = pre.find("code")
             if code:
@@ -913,51 +586,7 @@ class EpubGenerator:
                         div.append(p_tag)
                     pre.replace_with(div)
                     logger.info("EpubGenerator: Replaced stray code block with clean paragraphs.")
-
-        # 10. Unwrap spans that contain <br> tags to make splitting paragraphs easy
-        for span in list(soup.find_all("span")):
-            if span.find("br"):
-                span.unwrap()
-
-        # 11. Replace line breaks '<br/>' with </p><p> tags safely inside <p> elements
-        for p in list(soup.find_all("p")):
-            if p.find("br") and p.parent:
-                current_p = soup.new_tag("p")
-                if p.get("class"):
-                    current_p["class"] = p["class"]
-                for child in list(p.contents):
-                    if child.name == "br":
-                        p.insert_before(current_p)
-                        current_p = soup.new_tag("p")
-                        if p.get("class"):
-                            current_p["class"] = p["class"]
-                    else:
-                        current_p.append(child)
-                p.insert_before(current_p)
-                p.decompose()
-
-        # 12. Enforce list items content inside a paragraph
-        for li in list(soup.find_all("li")):
-            for inner_p in list(li.find_all("p")):
-                inner_p.unwrap()
-                
-            nested_lists = []
-            for sub_list in list(li.find_all(["ul", "ol"], recursive=False)):
-                sub_list.extract()
-                nested_lists.append(sub_list)
-                
-            contents = list(li.contents)
-            if contents:
-                has_visible_content = any(not isinstance(c, str) or c.strip() for c in contents)
-                if has_visible_content:
-                    p_tag = soup.new_tag("p")
-                    li.clear()
-                    li.append(p_tag)
-                    p_tag.extend(contents)
-            
-            for nl in nested_lists:
-                li.append(nl)
-                
+                    
         return str(soup)
 
     def compile_section_html(self, sec: Section, module_num: int, doc_title: str, doc_author: str, ch_num: str = None) -> str:
@@ -1064,186 +693,56 @@ class EpubGenerator:
 </script>"""
             
         elif is_exercise and sec.level == 1:
-            is_fib = "fill in the blank" in title_lower or "fill in blank" in title_lower or "fill in the blanks" in title_lower
-            is_mtc = "match the" in title_lower or "match column" in title_lower or "match following" in title_lower
-            if is_fib:
-                questions = parse_fitb_markdown(combined_md)
-                q_blocks = []
-                for q in questions:
-                    q_num = q["number"]
-                    correct_ans = q["answer"] or ""
-                    
-                    raw_q_html = self.converter.md.renderInline(q["question"]).strip()
-                    blank_input = f'<input type="text" id="blank{q_num}-0" class="blank" placeholder="Answer {q_num}" />'
-                    q_text_html = re.sub(r'_{3,}', blank_input, raw_q_html, count=1)
-                    if blank_input not in q_text_html:
-                        q_text_html += " " + blank_input
-                        
-                    q_blocks.append(f"""    <div class="question">
-        <h3>Question {q_num}</h3>
-        <p>{q_text_html}</p>
-        <p id="feedback{q_num}-0" class="feedback" data-correct="{correct_ans}"></p>
-    </div>""")
-                q_blocks_str = "\n".join(q_blocks)
-                
-                header_text = title.strip()
-                html_body = f"""<style>
-        .feedback {{ margin-top: 10px; min-height: 20px; }}
-        .feedback-correct {{ color: green; }}
-        .feedback-incorrect {{ color: red; }}
-        .feedback-answer {{ color: blue; }}
-        .controls {{ margin: 20px 0; }}
-        .blank {{ margin: 5px; }}
-        .blank:focus {{
-            border-color: #007BFF;
-            outline: none;
-            background-color: #f0f8ff;
-        }}
-        .question {{ margin-bottom: 10px; padding: 15px; border: 1px solid #ddd; }}
-</style>
-<p>&#160;</p>
-<p class="topic_header">{header_text}</p>
-<p></p>
-<div id="questionsContainer">
-{q_blocks_str}
-</div>
-<p>&#160;</p>
-<div class="controls" style="text-align:center;">
-    <button onclick="showCorrectAnswers()">Show Answers</button>
-</div>
-<script type="text/javascript">
-    function validateAnswer(questionIndex, blankIndex) {{
-        var input = document.getElementById('blank' + questionIndex + '-' + blankIndex);
-        var feedback = document.getElementById('feedback' + questionIndex + '-' + blankIndex);
-        if (!input || !feedback) return;
-        var correctAnswer = feedback.getAttribute('data-correct').toLowerCase().trim();
-        var userAnswer = input.value.toLowerCase().trim();
-
-        if (userAnswer === correctAnswer) {{
-            feedback.textContent = 'Correct!';
-            feedback.className = 'feedback feedback-correct';
-        }} else {{
-            feedback.textContent = 'Incorrect. Try again.';
-            feedback.className = 'feedback feedback-incorrect';
-        }}
-    }}
-
-    function showCorrectAnswers() {{
-        var feedbacks = document.querySelectorAll('.feedback');
-        feedbacks.forEach(function(feedback) {{
-            var correct = feedback.getAttribute('data-correct');
-            feedback.textContent = 'Correct answer: ' + correct;
-            feedback.className = 'feedback feedback-answer';
-        }});
-    }}
-
-    // Initialize validation for all inputs
-    document.querySelectorAll('input[type="text"]').forEach(function(input) {{
-        var idParts = input.id.replace('blank', '').split('-');
-        if (idParts.length === 2) {{
-            var qIndex = idParts[0];
-            var bIndex = idParts[1];
-            input.onblur = function() {{ validateAnswer(qIndex, bIndex); }};
-        }}
-    }});
-</script>"""
-            elif is_mtc:
-                mtc_data = parse_mtc_markdown(combined_md)
-                left_html = []
-                for item in mtc_data["left"]:
-                    left_html.append(f'  <div class="option" data-match="{item["match_id"]}">{item["text"]}</div>')
-                left_str = "\n".join(left_html)
-                
-                right_html = []
-                for item in mtc_data["right"]:
-                    right_html.append(f'  <div class="option" data-match="{item["match_id"]}">{item["text"]}</div>')
-                right_str = "\n".join(right_html)
-                
-                header_text = title.strip()
-                html_body = f"""<style>
-        .quiz-container {{ display:flex; justify-content:space-between; padding:20px; max-width:100%; margin:30px auto; background:#ffffff; border-radius:12px; border:1px solid #ddd; overflow:hidden; }}
-        .column {{ width:45%; }}
-        .option {{ padding:15px; margin:25px 0; border:2px solid #0288d1; border-radius:12px; background:#ffffff; cursor:pointer; user-select:none; transition:background-color .3s, transform .3s, box-shadow .3s; font-weight:600; text-align:center; box-shadow:0 4px 8px rgba(0,0,0,0.1); }}
-        .option:hover {{ background:#e1f5fe; transform:scale(1.02); }}
-        .option.selected {{ background:#0288d1; color:#fff; }}
-        .option.matched {{ background:#4caf50; color:#fff; cursor:default; pointer-events:none; }}
-        .feedback {{ margin-top:20px; font-weight:700; text-align:center; color:#d32f2f; min-height: 20px; }}
-</style>
-<p>&#160;</p>
-<p class="topic_header">{header_text}</p>
-<p id="feedback" class="feedback"></p>
-<div class="quiz-container">
-    <div class="column" id="left-column">
-        <p style="text-align:center;"><b>Group A</b></p>
-{left_str}
-    </div>
-    <div class="column" id="right-column">
-        <p style="text-align:center;"><b>Group B</b></p>
-{right_str}
-    </div>
-</div>
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded', function() {{
-    var selectedOption = null;
-    var feedbackElement = document.getElementById('feedback');
-    
-    function showFeedback(message, success) {{
-        feedbackElement.textContent = message;
-        feedbackElement.style.color = success ? '#388e3c' : '#d32f2f';
-    }}
-
-    function handleOptionClick(event) {{
-        var clickedOption = event.target;
-        if (!clickedOption.classList.contains('option') || clickedOption.classList.contains('matched')) return;
-        
-        if (selectedOption) {{
-            if (selectedOption !== clickedOption) {{
-                var parent1 = selectedOption.closest('.column');
-                var parent2 = clickedOption.closest('.column');
-                if (parent1 === parent2) {{
-                    selectedOption.classList.remove('selected');
-                    selectedOption = clickedOption;
-                    selectedOption.classList.add('selected');
-                    return;
-                }}
-                
-                if (selectedOption.getAttribute('data-match') === clickedOption.getAttribute('data-match')) {{
-                    selectedOption.classList.add('matched');
-                    clickedOption.classList.add('matched');
-                    selectedOption.classList.remove('selected');
-                    selectedOption = null;
-                    showFeedback('Correct match!', true);
-                }} else {{
-                    selectedOption.classList.remove('selected');
-                    clickedOption.classList.remove('selected');
-                    selectedOption = null;
-                    showFeedback('Wrong match. Please try again!', false);
-                }}
-            }}
-        }} else {{
-            selectedOption = clickedOption;
-            selectedOption.classList.add('selected');
-            showFeedback('', false);
-        }}
-    }}
-
-    document.querySelectorAll('.column').forEach(function(c) {{
-        c.addEventListener('click', handleOptionClick);
-    }});
-}});
-</script>"""
-            else:
-                raw_html = self.converter.convert(combined_md)
-                soup = BeautifulSoup(raw_html, "html.parser")
-                first_h = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"])
-                if first_h:
-                    first_h.decompose()
-                body_contents = soup.decode_contents().strip()
-                
-                header_text = title.strip().upper()
-                html_body = f"""<p>&#160;</p>
+            # Other exercises (Match the column, Quiz, sample question paper, etc.)
+            raw_html = self.converter.convert(combined_md)
+            soup = BeautifulSoup(raw_html, "html.parser")
+            first_h = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"])
+            if first_h:
+                first_h.decompose()
+            body_contents = soup.decode_contents().strip()
+            
+            header_text = title.strip().upper()
+            html_body = f"""<p>&#160;</p>
 <p class="exercise_header_yellow">{header_text}</p>
 {body_contents}"""
+            
+            # Check if this is a Fill in the Blanks section, and dynamically generate an answer key using LLM
+            is_fib = "fill in the blank" in title_lower or "fill in blank" in title_lower or "fill in the blanks" in title_lower
+            if is_fib:
+                try:
+                    from app.agents.base import BaseAgent
+                    agent = BaseAgent(api_key=self.api_key)
+                    agent.model = settings.LLM_MODEL
+                    prompt = """You are an educational textbook editor. 
+Your task is to solve the given Fill in the Blanks questions based on textbook contents.
+Format the output as a simple numbered list of answers (one per line, just the answered phrase/word, no question text).
+For example:
+1. Blueprint for a Green Economy
+2. low-carbon
+
+Do not output any introductory or concluding text. Just the numbered answers."""
+                    
+                    logger.info(f"EpubGenerator: Dynamically generating FIB answers using LLM for '{title}'...")
+                    answers_text = agent.generate_completion(system_prompt=prompt, user_content=combined_md, temperature=0.1)
+                    
+                    answers_list = []
+                    for line in answers_text.split("\n"):
+                        line_clean = line.strip()
+                        if line_clean:
+                            line_clean = re.sub(r'^\d+[\.\s\-\)]+\s*', '', line_clean).strip()
+                            if line_clean:
+                                answers_list.append(line_clean)
+                    
+                    if answers_list:
+                        fib_answers_html = '\n<p class="level_1">&#160;</p>\n<p><strong>Answer Key:</strong></p>\n'
+                        fib_answers_html += '<ol class="list_">\n'
+                        for ans in answers_list:
+                            fib_answers_html += f'  <li>{ans}</li>\n'
+                        fib_answers_html += '</ol>\n'
+                        html_body += fib_answers_html
+                        logger.info(f"EpubGenerator: Successfully appended dynamic answer key (count={len(answers_list)}) to FIB section '{title}'")
+                except Exception as e:
+                    logger.error(f"EpubGenerator: Failed to generate dynamic FIB answer key: {e}")
             
         elif is_cs:
             html_body = format_case_studies(combined_md)
@@ -1437,7 +936,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             html_body += '\n<p class="level_1">&#160;</p>\n<p class="chapter_end">**************************</p>\n<p class="level_1">&#160;</p>'
         else:
             if ch_num:
-                clean_title = re.sub(r'(?i)^(?:chapter|unit|module)\s*\d+\s*[:\-]?\s*', '', title).strip()
+                clean_title = re.sub(r'(?i)^chapter\s*\d+\s*[:\-]?\s*', '', title).strip()
                 header_table = f"""<p>&#160;</p>
 <table class="chapter_header" id="chapter">
   <tbody>
@@ -1878,133 +1377,6 @@ label {
   color: black;
 }
 """
-        # Append dynamic/custom textbook styles to css_content
-        css_content += """
-/* textbook component block styles */
-.tb-box {
-  background: var(--box-bg);
-  border: 1px solid var(--box-border);
-  border-left: 4px solid var(--box-accent);
-  border-radius: 12px;
-  padding: 16px 18px;
-  margin: 1.5rem 0;
-}
-.tb-box__label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--box-text);
-  margin-bottom: 8px;
-}
-.tb-box__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: var(--box-accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.tb-box__body {
-  font-size: 15.5px;
-  line-height: 1.65;
-}
-.tb-box__body p { margin: 0 0 0.6em; }
-.tb-box__body p:last-child { margin-bottom: 0; }
-.tb-box__body ul, .tb-box__body ol { margin: 0.4em 0 0; padding-left: 1.3em; }
-.tb-box__body li { margin-bottom: 0.35em; }
-
-.key-term {
-  font-weight: 700;
-  color: #7A2951;
-  background: #FCEAF1;
-  border: 1.5px solid #F0B9D2;
-  border-left: 4px solid #C2427A;
-  border-radius: 4px;
-  padding: 2px 9px 2px 8px;
-  white-space: nowrap;
-}
-.key-term-block {
-  --box-bg: #FCEAF1;
-  --box-border: #F0B9D2;
-  --box-accent: #C2427A;
-  --box-text: #7A2951;
-}
-.key-term-block__term {
-  display: inline-block;
-  font-weight: 700;
-  color: #7A2951;
-  background: #ffffff;
-  border: 1px solid #F0B9D2;
-  border-radius: 5px;
-  padding: 1px 8px;
-  margin-right: 8px;
-}
-.key-term-block__def {
-  font-size: 15.5px;
-  line-height: 1.65;
-}
-
-.definition-box  { --box-bg: #F3F1FB; --box-border: #DAD3F2; --box-accent: #6D53C7; --box-text: #3B2C82; }
-.note-box        { --box-bg: #EEF1F3; --box-border: #D7DEE3; --box-accent: #5B6B7A; --box-text: #33414D; }
-.example-box     { --box-bg: #E9F6F1; --box-border: #C3E7D9; --box-accent: #1F9D77; --box-text: #0F5C46; }
-.activity-box    { --box-bg: #FFF3E7; --box-border: #F7DCB8; --box-accent: #D97C1F; --box-text: #8A4C0C; }
-.important-box   { --box-bg: #FDECEC; --box-border: #F6C8C8; --box-accent: #C4302B; --box-text: #7E1E1B; }
-.warning-box     { --box-bg: #FFF8E1; --box-border: #F3E0A0; --box-accent: #B8860B; --box-text: #7A5A06; }
-.fact-box        { --box-bg: #E8F6FA; --box-border: #C2E7F0; --box-accent: #1090B0; --box-text: #0A5D73; }
-.case-box        { --box-bg: #F2F0EC; --box-border: #DEDAD0; --box-accent: #74695A; --box-text: #4A4136; }
-.summary-box     { --box-bg: #EDF6E9; --box-border: #CBE7C0; --box-accent: #4E9A34; --box-text: #2E5E1F; }
-.learning-box    { --box-bg: #EEF0FC; --box-border: #D2D6F3; --box-accent: #4C5BC9; --box-text: #2C3585; }
-.exam-tip        { --box-bg: #F7EEF9; --box-border: #E7CFEE; --box-accent: #9A3FAE; --box-text: #6A2678; }
-.realworld-box   { --box-bg: #E7F0FB; --box-border: #C6DBF2; --box-accent: #2563C7; --box-text: #163E7E; }
-.formula-box     { --box-bg: #F5F5F3; --box-border: #DEDCD4; --box-accent: #40403A; --box-text: #232320; text-align: center; }
-.formula-box .tb-box__label { justify-content: center; }
-.formula-box__expr { font-family: monospace; font-size: 17px; font-weight: 600; padding: 6px 0; }
-.formula-box__note { font-size: 13px; color: #5b5a53; margin-top: 6px; }
-
-.flow-box        { --box-bg: #FAFAF8; --box-border: #E2E0D7; --box-accent: #6B6A61; --box-text: #232320; }
-.flow-box__steps { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
-.flow-box__step  { display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #E2E0D7; border-radius: 8px; padding: 10px 14px; font-size: 14px; margin: 4px 8px 4px 0; }
-.flow-box__num   { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #6B6A61; color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-.flow-box__arrow { display: inline-flex; align-items: center; color: #6B6A61; font-size: 16px; margin: 4px 2px; }
-
-.timeline-box    { --box-bg: #EEF5F3; --box-border: #CDE2DB; --box-accent: #4F7A78; --box-text: #2B4E4B; }
-.timeline-box__list { position: relative; margin: 4px 0 0; padding-left: 20px; border-left: 2px solid #CDE2DB; }
-.timeline-box__event { position: relative; padding: 0 0 16px 16px; }
-.timeline-box__event:last-child { padding-bottom: 0; }
-.timeline-box__event::before { content: ""; position: absolute; left: -25px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: #4F7A78; border: 2px solid #ffffff; }
-.timeline-box__date { display: block; font-size: 12px; font-weight: 700; color: #4F7A78; margin-bottom: 2px; }
-.timeline-box__desc { font-size: 14.5px; line-height: 1.55; }
-
-/* Custom row/cell highlights */
-.row-blue { background-color: #dbeafe !important; }
-.row-green { background-color: #dcfce7 !important; }
-.row-orange { background-color: #ffedd5 !important; }
-.row-purple { background-color: #f3e8ff !important; }
-.row-red { background-color: #fee2e2 !important; }
-.row-alt-grey { background-color: #f3f4f6 !important; }
-
-.cell-blue { background-color: #dbeafe !important; }
-.cell-green { background-color: #dcfce7 !important; }
-.cell-orange { background-color: #ffedd5 !important; }
-.cell-purple { background-color: #f3e8ff !important; }
-.cell-red { background-color: #fee2e2 !important; }
-"""
-        # Append compiled dynamic table/span classes
-        generated_css_str = "\n/* Dynamically generated classes for clean inline styling */\n"
-        for class_name, declarations in self.generated_css_classes.items():
-            decls_str = " ".join(f"{k}: {v};" for k, v in declarations)
-            generated_css_str += f".{class_name} {{ {decls_str} }}\n"
-        css_content += generated_css_str
-
         style_item = epub.EpubItem(
             uid="style",
             file_name="style/style.css",
@@ -2058,8 +1430,8 @@ label {
             import shutil
             try:
                 shutil.copy2(cover_path, media_cover)
-                logger.info(f"EpubGenerator: Copied cover image {cover_path.name} to images/cover2.jpg")
-                book.set_cover("images/cover2.jpg", media_cover.read_bytes())
+                logger.info(f"EpubGenerator: Copied cover image {cover_path.name} to media/cover2.jpg")
+                book.set_cover("media/cover2.jpg", media_cover.read_bytes())
                 cover_image_added = True
                 logger.info("EpubGenerator: Registered cover image with EbookLib")
             except Exception as e:
@@ -2085,28 +1457,14 @@ label {
                         img_content = img_path.read_bytes()
                         img_item = epub.EpubImage(
                             uid=f"img_{img_path.stem}",
-                            file_name=f"images/{img_path.name}",
+                            file_name=f"media/{img_path.name}",
                             media_type=media_type,
                             content=img_content
                         )
                         book.add_item(img_item)
-                        logger.info(f"EpubGenerator: Added media image: images/{img_path.name}")
+                        logger.info(f"EpubGenerator: Added media image: media/{img_path.name}")
                     except Exception as e:
                         logger.error(f"EpubGenerator: Failed to add image {img_path.name} to EPUB: {e}")
-
-        # Add dynamically extracted base64 images
-        for filename, img_data, media_type in self.dynamic_images:
-            try:
-                img_item = epub.EpubImage(
-                    uid=f"dyn_img_{filename.split('.')[0]}",
-                    file_name=f"images/{filename}",
-                    media_type=media_type,
-                    content=img_data
-                )
-                book.add_item(img_item)
-                logger.info(f"EpubGenerator: Added dynamically extracted base64 image: images/{filename}")
-            except Exception as e:
-                logger.error(f"EpubGenerator: Failed to add dynamic image {filename} to EPUB: {e}")
 
         # 5. Compile the Cover page XHTML — only if a cover image was found in the docx
         spine_items = []
@@ -2126,7 +1484,7 @@ label {
 </head>
 <body id="cover">
 <div id="cover-image">
-<img src="images/cover2.jpg" alt="cover image" class="img_class"/>
+<img src="media/cover2.jpg" alt="cover image" class="img_class"/>
 </div>
 </body></html>"""
             cover_html.add_item(style_item)
@@ -2329,6 +1687,15 @@ label {
                     chapter_module_map[ch_title.lower().strip()] = mod_num
         logger.info(f"EpubGenerator: Built chapter-to-module map from blueprint: {chapter_module_map}")
 
+        # spine_items already initialized above (with cover if image exists)
+        spine_items.append(copyright_html)
+        toc_items = []
+        
+        # State trackers
+        module_num = 1
+        last_seen_module = 1
+        real_chapter_index = 0
+        
         # Blacklist of titles that are NOT real content chapters
         non_chapter_keywords = [
             'author', 'about author', 'about book', 'about the book', 'acknowledg',
@@ -2338,48 +1705,6 @@ label {
             'fill in the blank', 'fill in blank', 'fill in the blanks', 'answers', 'practice questions',
             'brief answer', 'short notes'
         ]
-
-        # Dynamically promote real content chapters (even if Level-2 in DB) to Level-1
-        for sec in sections:
-            if sec.level > 1 and not any(kw in sec.title.lower() for kw in non_chapter_keywords) and not is_exercise_title(sec.title):
-                # Check regex: if it explicitly starts with Chapter, Unit, or Module
-                if bool(re.match(r'(?i)^(?:chapter|unit|module)\b', sec.title.strip())):
-                    sec.level = 1
-                    self.db.add(sec)
-                else:
-                    # Check blueprint
-                    in_blueprint = False
-                    for mod in blueprint_modules:
-                        for ch in mod.get("chapters", []):
-                            if ch.get("chapter_title", "").lower().strip() in sec.title.lower():
-                                in_blueprint = True
-                                break
-                    if in_blueprint:
-                        sec.level = 1
-                        self.db.add(sec)
-                    elif valid_chapter_titles:
-                        clean_sec_title = re.sub(r'[^a-zA-Z0-9\s]', '', sec.title).lower().strip()
-                        if clean_sec_title in valid_chapter_titles or any(kw in sec.title.lower() for kw in valid_chapter_titles):
-                            sec.level = 1
-                            self.db.add(sec)
-        self.db.commit()
-        
-        # Re-query sections to ensure updated level state is reflected in level1_sections
-        sections = self.db.query(Section)\
-            .filter(Section.document_id == document_id)\
-            .order_by(Section.position)\
-            .all()
-        level1_sections = [s for s in sections if s.level == 1]
-
-        # spine_items already initialized above (with cover if image exists)
-        spine_items.append(copyright_html)
-        toc_items = []
-        
-        # State trackers
-        module_num = 1
-        last_seen_module = 1
-        real_chapter_index = 0
-        last_real_chapter_num = None
         
         for ch_sec in level1_sections:
             title = ch_sec.title
@@ -2425,10 +1750,17 @@ label {
                 module_num = matched_module
                 logger.info(f"EpubGenerator: Section '{title}' mapped to Module {module_num} via blueprint/syllabus.")
             else:
-                # Extract module number directly from title if explicitly present, e.g. "Module 2"
-                m_mod = re.search(r'(?i)module\s*(\d+)', title)
-                if m_mod:
-                    module_num = int(m_mod.group(1))
+                # Fallback to stateful chapter parsing if syllabus match not found
+                if "chapter" in title_lower:
+                    match = re.search(r'\d+', title)
+                    if match:
+                        ch_idx = int(match.group(0))
+                        max_mod = max(chapter_module_map.values()) if chapter_module_map else 2
+                        module_num = 1 if ch_idx <= 4 else max_mod
+                elif "module" in title_lower:
+                    match = re.search(r'module\s*(\d+)', title_lower)
+                    if match:
+                        module_num = int(match.group(1))
                         
             # Reset chapter index if module changes
             if module_num != last_seen_module:
@@ -2439,32 +1771,24 @@ label {
             # Check if this Level-1 section is a real content chapter
             is_real_chapter = False
             if not any(kw in title_lower for kw in non_chapter_keywords) and not is_exercise_title(title):
-                if bool(re.match(r'(?i)^(?:chapter|unit|module)\b', title.strip())):
+                # Try blueprint chapter matching first
+                in_blueprint_chapters = False
+                for mod in blueprint_modules:
+                    for ch in mod.get("chapters", []):
+                        ch_title = ch.get("chapter_title", "")
+                        if ch_title and ch_title.lower().strip() in title_lower:
+                            in_blueprint_chapters = True
+                            break
+                if in_blueprint_chapters:
                     is_real_chapter = True
+                elif valid_chapter_titles:
+                    is_real_chapter = any(kw in title_lower for kw in valid_chapter_titles)
                 else:
-                    # Try blueprint chapter matching first
-                    in_blueprint_chapters = False
-                    for mod in blueprint_modules:
-                        for ch in mod.get("chapters", []):
-                            ch_title = ch.get("chapter_title", "")
-                            if ch_title and ch_title.lower().strip() in title_lower:
-                                in_blueprint_chapters = True
-                                break
-                    if in_blueprint_chapters:
-                        is_real_chapter = True
-                    elif valid_chapter_titles:
-                        is_real_chapter = any(kw in title_lower for kw in valid_chapter_titles)
-                    else:
-                        is_real_chapter = bool(re.match(r'(?i)^(?:chapter|unit|module)\b', title.strip()))
+                    is_real_chapter = bool(re.match(r'(?i)^(?:chapter|unit|module)\s*\d+', title.strip()))
             
             if is_real_chapter:
-                num_match = re.search(r'(?i)^(?:chapter|unit|module)\s*(\d+)', title.strip())
-                if num_match:
-                    ch_num = num_match.group(1)
-                else:
-                    real_chapter_index += 1
-                    ch_num = str(real_chapter_index)
-                last_real_chapter_num = ch_num
+                real_chapter_index += 1
+                ch_num = str(real_chapter_index)
             else:
                 ch_num = None
                 
@@ -2483,7 +1807,7 @@ label {
                 else:
                     display_title = display_title
 
-            file_name = get_file_name_for_section(title, ch_sec.position, module_num, last_real_chapter_num)
+            file_name = get_file_name_for_section(title, ch_sec.position, module_num)
             
             ch_html = epub.EpubHtml(
                 title=display_title,
@@ -2542,11 +1866,9 @@ label {
         return output_path
 
 
-def get_file_name_for_section(title: str, position: int, module_num: int, ch_num: str = None) -> str:
+def get_file_name_for_section(title: str, position: int, module_num: int) -> str:
     title_lower = title.lower()
-    if "title page" in title_lower or "cover" in title_lower:
-        return "cover.xhtml"
-    elif "about author" in title_lower:
+    if "about author" in title_lower:
         return "About_Author.xhtml"
     elif "about the book" in title_lower or "about book" in title_lower:
         return "About_Book.xhtml"
@@ -2556,28 +1878,14 @@ def get_file_name_for_section(title: str, position: int, module_num: int, ch_num
         return "Syllabus.xhtml"
     elif "copyright" in title_lower:
         return "Copyright.xhtml"
-    elif "fill in the blank" in title_lower or "fill in blank" in title_lower or "fill in the blanks" in title_lower:
-        ch_part = f"_Chapter{ch_num}" if ch_num else f"_{position}"
-        return f"M{module_num}{ch_part}_FITB.xhtml"
     elif "mcq" in title_lower or "choice question" in title_lower:
-        ch_part = f"_Chapter{ch_num}" if ch_num else f"_{position}"
-        return f"M{module_num}{ch_part}_MCQ.xhtml"
-    elif "true or false" in title_lower or "true/false" in title_lower:
-        ch_part = f"_Chapter{ch_num}" if ch_num else f"_{position}"
-        return f"M{module_num}{ch_part}_TOF.xhtml"
-    elif "match the" in title_lower or "match column" in title_lower or "match following" in title_lower:
-        ch_part = f"_Chapter{ch_num}" if ch_num else f"_{position}"
-        return f"M{module_num}{ch_part}_MTC.xhtml"
+        return f"M{module_num}_MCQ_{position}.xhtml"
     elif "case studies" in title_lower or "case study" in title_lower:
-        ch_part = f"_Chapter{ch_num}" if ch_num else f"_{position}"
-        return f"M{module_num}{ch_part}_Case_Studies.xhtml"
+        return f"M{module_num}_Case_Studies_{position}.xhtml"
     elif "chapter" in title_lower:
         match = re.search(r'\d+', title)
-        ch_idx = match.group(0) if match else str(position)
-        return f"M{module_num}_Chapter{ch_idx}.xhtml"
+        ch_num = match.group(0) if match else str(position)
+        return f"M{module_num}_Chapter{ch_num}.xhtml"
     else:
         sanitized = re.sub(r'[^a-zA-Z0-9]', '_', title).strip('_')
-        sanitized = '_'.join(w for w in sanitized.split('_') if w)
-        if not sanitized:
-            sanitized = f"section_{position}"
-        return f"{sanitized}.xhtml"
+        return f"section_{position}_{sanitized}.xhtml"

@@ -25,5 +25,5 @@ db_session = scoped_session(SessionLocal)
 def init_db():
     """Initializes the database schema and creates all tables."""
     # Import models here to register them with the metadata
-    from app.models.document import Document, Section, UserPermission, BookAccess
+    from app.models.document import Document, Section
     Base.metadata.create_all(bind=engine)
